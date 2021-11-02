@@ -1,0 +1,52 @@
+---
+name: Build static binary
+on:
+  push:
+    tags:
+      - 'v*'
+env:
+  BUILDER_IMAGE: golang
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+          - arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+#      - name: Build skopeo binary file
+#        run: |
+#          DIGEST=$(skopeo --insecure-policy --override-arch ${{ matrix.arch }} inspect docker://${BUILDER_IMAGE} | jq -r '.Digest')
+#          sudo apt-get install go-md2man
+#          docker run -v $PWD:/src -w /src -e CGO_ENABLED=0 ${BUILDER_IMAGE}@${DIGEST} DISABLE_DOCS=1 make BUILDTAGS=containers_image_openpgp GO_DYN_FLAGS=
+#          cp ./bin/skopeo skopeo-linux-${{ matrix.arch }}
+#          sha256sum skopeo-linux-${{ matrix.arch }} > skopeo-linux-${{ matrix.arch }}.sha256sum.txt
+      - name: Build skopeo binary file
+        run: |
+           sudo apt install libgpgme-dev libassuan-dev libbtrfs-dev libdevmapper-dev pkg-config
+           sudo apt-get install go-md2man
+           DISABLE_DOCS=1 make
+           cp ./bin/skopeo
+           sha256sum skopeo > skopeo.sha256sum.txt
+
+      - name: Release and upload binary file
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            skopeo
+            skopeo.sha256sum.txt
+
